@@ -23,8 +23,6 @@ export default function DashboardPage() {
   );
 
   const [isLoading, setIsLoading] = useState(true);
-
-  // 데이터 상태
   const [stats, setStats] = useState({
     total: 0,
     normal: 0,
@@ -34,9 +32,7 @@ export default function DashboardPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
 
-  // 데이터 가져오기 (Realtime 재사용을 위해 useCallback 사용)
   const fetchData = useCallback(async () => {
-    // 1. 공장 데이터 (통계용)
     const { data: factoryData } = await supabase
       .from('factories')
       .select('status');
@@ -50,7 +46,6 @@ export default function DashboardPage() {
       });
     }
 
-    // 2. 로그 데이터 (최신 20개)
     const { data: logData } = await supabase
       .from('event_logs')
       .select('*')
@@ -59,7 +54,6 @@ export default function DashboardPage() {
 
     if (logData) {
       setLogs(logData);
-      // 경고/위험 상태인 최신 로그 추출 (상단 알림용)
       const alerts = logData
         .filter((log) => log.status === 'WARNING' || log.status === 'DANGER')
         .slice(0, 3);
@@ -69,7 +63,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const init = async () => {
-      // 로그인 체크
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -77,25 +70,23 @@ export default function DashboardPage() {
         router.replace('/login');
         return;
       }
-      // 초기 데이터 로드
       await fetchData();
       setIsLoading(false);
     };
 
     init();
 
-    // 3. 실시간 구독 (DB 변경 시 자동 업데이트)
     const channel = supabase
       .channel('dashboard-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'factories' },
-        () => fetchData() // 공장 상태 변경 시 통계 갱신
+        () => fetchData()
       )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'event_logs' },
-        () => fetchData() // 새 로그 추가 시 목록 갱신
+        () => fetchData()
       )
       .subscribe();
 
@@ -115,7 +106,6 @@ export default function DashboardPage() {
     );
   }
 
-  // 카드 스타일 헬퍼
   const getCardStyle = (type: string) => {
     switch (type) {
       case 'green':
@@ -130,9 +120,9 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-6 h-full flex flex-col gap-6 bg-slate-950 overflow-hidden">
-      {/* 1. 상단 통계 카드 영역 */}
-      <div className="grid grid-cols-4 gap-4 flex-shrink-0">
+    <div className="p-4 lg:p-6 h-full flex flex-col gap-4 lg:gap-6 bg-slate-950 overflow-y-auto lg:overflow-hidden">
+      {/* 1. 상단 통계 카드 (모바일 2열 / PC 4열) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 flex-shrink-0">
         {[
           {
             label: '전체 모니터링',
@@ -165,30 +155,34 @@ export default function DashboardPage() {
         ].map((stat, idx) => (
           <div
             key={idx}
-            className={`p-4 rounded-xl border flex items-center justify-between ${getCardStyle(
+            className={`p-3 lg:p-4 rounded-xl border flex items-center justify-between ${getCardStyle(
               stat.color
             )} shadow-lg transition-all duration-500`}
           >
             <div>
-              <p className="text-xs font-bold opacity-70 mb-1">{stat.label}</p>
+              <p className="text-[10px] lg:text-xs font-bold opacity-70 mb-1">
+                {stat.label}
+              </p>
               <div className="flex items-baseline gap-1">
-                <h3 className="text-2xl font-bold">{stat.value}</h3>
-                <span className="text-xs opacity-70">{stat.unit}</span>
+                <h3 className="text-xl lg:text-2xl font-bold">{stat.value}</h3>
+                <span className="text-[10px] lg:text-xs opacity-70">
+                  {stat.unit}
+                </span>
               </div>
             </div>
-            <div className={`p-2 rounded-lg bg-black/20`}>
-              <stat.icon size={24} />
+            <div className={`p-1.5 lg:p-2 rounded-lg bg-black/20`}>
+              <stat.icon size={20} className="lg:w-6 lg:h-6" />
             </div>
           </div>
         ))}
       </div>
 
-      {/* 2. 메인 컨텐츠 그리드 (좌측: 지도+차트 / 우측: 알림+로그) */}
-      <div className="flex-1 grid grid-cols-12 gap-6 min-h-0">
-        {/* [좌측] 지도 및 통계 차트 (8칸 차지) */}
-        <div className="col-span-8 flex flex-col gap-6 h-full">
-          {/* 지도 영역 (높이 60%) */}
-          <div className="flex-[0.6] bg-slate-900 rounded-xl border border-slate-800 overflow-hidden relative shadow-lg flex flex-col">
+      {/* 2. 메인 컨텐츠 그리드 (모바일: 세로 쌓기 / PC: 가로 12칸 그리드) */}
+      <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-6 min-h-0">
+        {/* [좌측] 지도 및 통계 차트 (PC: 8칸) */}
+        <div className="col-span-8 flex flex-col gap-4 lg:gap-6 lg:h-full">
+          {/* 지도 영역 (모바일: 높이 400px 고정 / PC: 비율 채움) */}
+          <div className="h-[400px] lg:h-auto lg:flex-[0.6] bg-slate-900 rounded-xl border border-slate-800 overflow-hidden relative shadow-lg flex flex-col">
             <div className="absolute top-4 left-4 z-10 bg-slate-950/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-700 text-xs font-bold text-slate-300 flex items-center gap-2">
               <Activity size={14} className="text-blue-500" />
               실시간 위치 관제
@@ -198,17 +192,17 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 📊 차트 영역 (높이 40%) - 새로 추가된 부분 */}
-          <div className="flex-[0.4] min-h-0">
+          {/* 차트 영역 (모바일: 높이 300px 고정 / PC: 비율 채움) */}
+          <div className="h-[300px] lg:h-auto lg:flex-[0.4] min-h-0">
             <DashboardChart />
           </div>
         </div>
 
-        {/* [우측] 알림 및 로그 패널 (4칸 차지) */}
-        <div className="col-span-4 flex flex-col gap-6 h-full overflow-hidden">
-          {/* 긴급 알림 현황 (높이 40%) */}
+        {/* [우측] 알림 및 로그 패널 (PC: 4칸) */}
+        <div className="col-span-4 flex flex-col gap-4 lg:gap-6 lg:h-full overflow-hidden">
+          {/* 긴급 알림 현황 (모바일: 높이 250px 고정 / PC: 비율 채움) */}
           <div
-            className={`flex-[0.4] bg-slate-900 rounded-xl border flex flex-col shadow-lg overflow-hidden transition-colors duration-500 ${
+            className={`h-[250px] lg:h-auto lg:flex-[0.4] bg-slate-900 rounded-xl border flex flex-col shadow-lg overflow-hidden transition-colors duration-500 ${
               activeAlerts.length > 0 ? 'border-red-500/30' : 'border-slate-800'
             }`}
           >
@@ -259,14 +253,17 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex justify-between items-start">
-                        <span className="font-bold text-red-200 text-sm">
+                        <span className="font-bold text-red-200 text-sm truncate">
                           {alert.factory_name}
                         </span>
-                        <span className="text-[10px] text-red-400/70">
-                          {new Date(alert.created_at).toLocaleTimeString()}
+                        <span className="text-[10px] text-red-400/70 whitespace-nowrap">
+                          {new Date(alert.created_at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
                         </span>
                       </div>
-                      <p className="text-xs text-red-300 mt-1">
+                      <p className="text-xs text-red-300 mt-1 line-clamp-2">
                         {alert.message}
                       </p>
                     </div>
@@ -276,8 +273,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 전체 감지 이력 (높이 60%) */}
-          <div className="flex-[0.6] bg-slate-900 rounded-xl border border-slate-800 flex flex-col shadow-lg overflow-hidden">
+          {/* 전체 감지 이력 (모바일: 높이 400px 고정 / PC: 비율 채움) */}
+          <div className="h-[400px] lg:h-auto lg:flex-[0.6] bg-slate-900 rounded-xl border border-slate-800 flex flex-col shadow-lg overflow-hidden">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
               <div className="flex items-center gap-2 font-bold text-slate-300">
                 <Clock size={18} />
